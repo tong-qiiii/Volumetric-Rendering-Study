@@ -11,6 +11,8 @@ A real-time volumetric fog and cloud rendering study implemented with Unity URP 
 - Procedural 3D value noise
 - FBM density field
 - Animated volumetric noise
+- Front-to-back volumetric color accumulation
+- URP main directional light color integration
 
 ## Tech Stack
 

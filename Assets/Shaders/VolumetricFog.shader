@@ -32,6 +32,7 @@ Shader "Custom/VolumetricFog"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             struct Attributes
             {
@@ -115,57 +116,45 @@ Shader "Custom/VolumetricFog"
 
             half4 frag(Varyings input) : SV_Target
             {
+                Light mainLight = GetMainLight();
+
                 float3 rayDir = normalize(input.positionWS - _WorldSpaceCameraPos);
-
                 float3 currentPos = input.positionWS + rayDir * 0.001;
-
                 float transmittance = 1.0;
+                float3 accumulatedColor = 0.0;
 
                 [loop]
                 for (int i = 0; i < 128; i++)
                 {
                     float3 positionOS = TransformWorldToObject(currentPos);
+                    if (any(abs(positionOS) > 0.5)) { break; }
 
-                    if (any(abs(positionOS) > 0.5))
-                    {
-                        break;
-                    }
-
-                    float distanceFromCenter = length(positionOS * 2.0);
-
+                    float distanceFromCenter = length(positionOS * 1.5);
                     float shape = saturate(1.0 - distanceFromCenter);
-                    shape = smoothstep(0.0, 1.0, shape);
+                    shape = smoothstep(0.0, 0.7, shape);
 
                     float3 noisePos = positionOS * _NoiseScale;
-
-                    noisePos += float3(
-                        _Time.y * _NoiseSpeed,
-                        0.0,
-                        _Time.y * _NoiseSpeed * 0.5
-                    );
+                    noisePos += float3(_Time.y * _NoiseSpeed, 0.0, _Time.y * _NoiseSpeed * 0.5);
 
                     float noise = fbm(noisePos);
-
                     float cloud = smoothstep(_NoiseThreshold, _NoiseThreshold + 0.15, noise);
-
                     float density = _Density * shape * cloud;
 
                     float stepTransmittance = exp(-density * _StepSize);
+                    float scatteringWeight = transmittance * (1.0 - stepTransmittance);
 
+                    accumulatedColor += scatteringWeight * _FogColor.rgb * mainLight.color;
                     transmittance *= stepTransmittance;
 
-                    if (transmittance < 0.01)
-                    {
-                        break;
-                    }
+                    if (transmittance < 0.01) { break; }
 
                     currentPos += rayDir * _StepSize;
                 }
 
                 float alpha = 1.0 - transmittance;
-
-                return half4(_FogColor.rgb, alpha);
+                return half4(accumulatedColor, alpha);
             }
+
 
             ENDHLSL
         }
