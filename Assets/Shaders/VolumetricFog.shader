@@ -129,7 +129,7 @@ Shader "Custom/VolumetricFog"
                     float3 positionOS = TransformWorldToObject(currentPos);
                     if (any(abs(positionOS) > 0.5)) { break; }
 
-                    float distanceFromCenter = length(positionOS * 1.5);
+                    float distanceFromCenter = length(positionOS * 1.3);
                     float shape = saturate(1.0 - distanceFromCenter);
                     shape = smoothstep(0.0, 0.7, shape);
 
@@ -140,11 +140,16 @@ Shader "Custom/VolumetricFog"
                     float cloud = smoothstep(_NoiseThreshold, _NoiseThreshold + 0.15, noise);
                     float density = _Density * shape * cloud;
 
+
                     float stepTransmittance = exp(-density * _StepSize);
                     float scatteringWeight = transmittance * (1.0 - stepTransmittance);
 
-                    accumulatedColor += scatteringWeight * _FogColor.rgb * mainLight.color;
+                    float cosTheta = dot(rayDir, mainLight.direction);
+                    float phase = 0.5 + 0.5 * cosTheta;
+
+                    accumulatedColor += scatteringWeight * _FogColor.rgb * mainLight.color * phase;
                     transmittance *= stepTransmittance;
+
 
                     if (transmittance < 0.01) { break; }
 
@@ -154,6 +159,7 @@ Shader "Custom/VolumetricFog"
                 float alpha = 1.0 - transmittance;
                 return half4(accumulatedColor, alpha);
             }
+
 
 
             ENDHLSL

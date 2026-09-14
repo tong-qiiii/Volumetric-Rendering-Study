@@ -13,6 +13,7 @@ A real-time volumetric fog and cloud rendering study implemented with Unity URP 
 - Animated volumetric noise
 - Front-to-back volumetric color accumulation
 - URP main directional light color integration
+- Direction-dependent volumetric scattering
 
 ## Tech Stack
 
@@ -28,8 +29,10 @@ At each sample point, the shader evaluates a procedural 3D density field constru
 
 ## Next Steps
 
-- Directional sunlight
+- Light direction integration
+- Phase function
 - Single scattering
-- Self-shadowing
+- Light marching and self-shadowing
 - Scene depth composition
 - Sampling quality / GPU performance experiments
+
