@@ -208,19 +208,25 @@ Shader "Custom/VolumetricFog"
                 float3 noisePosition = advectedPosition * _NoiseScale;
                 if (_UseWeatherMap > 0.5)
                 {
-                    // The map anchors cloud groups in the valley. Wind advects the 3D noise within them.
-                    float3 weather = SAMPLE_TEXTURE2D_LOD(_WeatherMap, sampler_WeatherMap, positionOS.xz + 0.5, 0).rgb;
-                    float coverage = smoothstep(0.03, 0.72, weather.r);
+                    // A small, height-dependent offset breaks up vertical walls from the 2D footprint.
+                    float3 warpPosition = advectedPosition * float3(8.0, 7.0, 8.0);
+                    float2 warp = float2(PerlinNoise(warpPosition + float3(7.3, 2.6, 9.1)),
+                        PerlinNoise(warpPosition + float3(3.1, 8.8, 4.2))) - 0.5;
+                    float2 weatherUV = positionOS.xz + 0.5 + warp * float2(0.066, 0.060);
+                    float3 weather = SAMPLE_TEXTURE2D_LOD(_WeatherMap, sampler_WeatherMap, weatherUV, 0).rgb;
+                    float coverage = smoothstep(0.03, 0.90, weather.r);
                     if (coverage <= 0.0)
                         return 0.0;
 
                     float baseHeight = weather.b;
-                    float thickness = max(0.05, weather.g - baseHeight) * lerp(0.57, 1.0, coverage);
+                    float thickness = max(0.05, weather.g - baseHeight);
                     float relativeHeight = (layer - baseHeight) / thickness;
-                    heightMask = smoothstep(0.0, 0.20, relativeHeight)
-                        * (1.0 - smoothstep(0.46, 1.0, relativeHeight));
+                    // Narrow the horizontal cross-section near both ends of the cloud.
+                    float verticalDistance = (relativeHeight - 0.44) / (relativeHeight < 0.44 ? 0.44 : 0.56);
+                    float outlineDistance = length(float2(1.0 - weather.r, verticalDistance));
+                    heightMask = 1.0 - smoothstep(0.33, 1.0, outlineDistance);
                     horizontalMask *= coverage;
-                    threshold += lerp(0.15, -0.065, coverage);
+                    threshold += lerp(0.15, -0.035, coverage);
                     noisePosition *= float3(1.85, 1.12, 1.15);
                 }
                 else if (_CloudBillow > 0.0)
