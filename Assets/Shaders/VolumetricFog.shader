@@ -14,12 +14,14 @@ Shader "Custom/VolumetricFog"
         _CloudTop ("Cloud Top", Range(0.05, 1)) = 0.90
         _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
         _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
+        _CloudBillow ("Billowing Shape", Range(0, 1)) = 0
         _WindDirection ("Local Wind Direction", Vector) = (1, 0, 0.5, 0)
 
         _Anisotropy ("Scattering Anisotropy", Range(-0.8, 0.8)) = 0.42
         _AmbientStrength ("Ambient Strength", Range(0, 1)) = 0.32
         [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
         _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
+        _CloudBounce ("Diffuse Light Fill", Range(0, 1)) = 0
     }
 
     SubShader
@@ -73,11 +75,13 @@ Shader "Custom/VolumetricFog"
                 float _CloudTop;
                 float _DetailScale;
                 float _Erosion;
+                float _CloudBillow;
                 float4 _WindDirection;
                 float _Anisotropy;
                 float _AmbientStrength;
                 float _LightSteps;
                 float _LightExtinction;
+                float _CloudBounce;
             CBUFFER_END
 
             Varyings vert(Attributes input)
@@ -185,15 +189,35 @@ Shader "Custom/VolumetricFog"
                 float height = positionOS.y + 0.5;
                 float layerHeight = max(0.05, _CloudTop - _CloudBase);
                 float layer = (height - _CloudBase) / layerHeight;
+                if (layer <= 0.0 || layer >= 1.0)
+                    return 0.0;
+
+                float3 advectedPosition = positionOS - windOffset;
                 float heightMask = smoothstep(0.0, 0.22, layer) * (1.0 - smoothstep(0.55, 1.0, layer));
                 float horizontalMask = 1.0 - smoothstep(0.24, 0.5, length(positionOS.xz));
+                if (horizontalMask <= 0.0)
+                    return 0.0;
+
+                float threshold = lerp(0.86, _NoiseThreshold, _Coverage);
+                float3 noisePosition = advectedPosition * _NoiseScale;
+                if (_CloudBillow > 0.0)
+                {
+                    // A slower 2D field controls where towers form and how high they rise.
+                    float weather = PerlinNoise(float3(advectedPosition.xz * float2(4.9, 3.1), 7.37));
+                    float tower = smoothstep(0.28, 0.72, weather);
+                    float top = lerp(0.46, 1.0, tower);
+                    float billowMask = smoothstep(0.0, 0.15, layer)
+                        * (1.0 - smoothstep(top * 0.52, top, layer));
+                    heightMask = lerp(heightMask, billowMask, _CloudBillow);
+                    threshold += _CloudBillow * lerp(0.14, -0.10, tower);
+                    noisePosition *= lerp(float3(1.0, 1.0, 1.0), float3(1.85, 0.92, 1.15), _CloudBillow);
+                }
+
                 float envelope = heightMask * horizontalMask;
                 if (envelope <= 0.0)
                     return 0.0;
 
-                float3 noisePosition = (positionOS - windOffset) * _NoiseScale;
                 float baseNoise = PerlinFbm(noisePosition);
-                float threshold = lerp(0.86, _NoiseThreshold, _Coverage);
                 float shape = smoothstep(threshold, threshold + 0.22, baseNoise) * envelope;
                 if (shape <= 0.0)
                     return 0.0;
@@ -201,7 +225,8 @@ Shader "Custom/VolumetricFog"
                 if (sampleDetail && _Erosion > 0.0)
                 {
                     float detail = WorleyNoise(noisePosition * _DetailScale + float3(9.1, 4.2, 1.7));
-                    shape = saturate(shape - _Erosion * detail * (1.0 - shape));
+                    float edgeWeight = 1.0 - shape;
+                    shape = saturate(shape - _Erosion * detail * edgeWeight);
                 }
                 return _Density * shape;
             }
@@ -271,7 +296,7 @@ Shader "Custom/VolumetricFog"
                 Light mainLight = GetMainLight();
                 float3 lightDirOS = TransformWorldToObjectDir(mainLight.direction, false);
                 float phase = RelativeHenyeyGreenstein(clamp(dot(rayDir, mainLight.direction), -1.0, 1.0));
-                float3 directColor = mainLight.color * (mainLight.distanceAttenuation * phase);
+                float3 sunColor = mainLight.color * mainLight.distanceAttenuation;
                 int lightSteps = (int)clamp(_LightSteps, 0.0, 8.0);
                 float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
                 float3 windOffset = wind * (_Time.y * _NoiseSpeed);
@@ -288,7 +313,10 @@ Shader "Custom/VolumetricFog"
                         continue;
 
                     float sunTransmittance = SunTransmittance(sampleOS, lightDirOS, windOffset, lightSteps);
-                    float3 sourceColor = _FogColor.rgb * (_AmbientStrength + directColor * sunTransmittance);
+                    // A broader, less attenuated lobe approximates light scattered into the cloud interior.
+                    float fill = _CloudBounce * max(0.0, sqrt(sunTransmittance) - sunTransmittance);
+                    float lighting = phase * sunTransmittance + fill;
+                    float3 sourceColor = _FogColor.rgb * (_AmbientStrength + sunColor * lighting);
                     float stepTransmittance = exp(-density * stepLength);
                     accumulatedColor += transmittance * (1.0 - stepTransmittance) * sourceColor;
                     transmittance *= stepTransmittance;
