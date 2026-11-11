@@ -8,7 +8,13 @@ Shader "Custom/VolumetricFog"
 
         _NoiseScale ("Noise Scale", Range(0.5, 10)) = 3.0
         _NoiseSpeed ("Noise Speed", Range(0, 2)) = 0.1
-        _NoiseThreshold ("Noise Threshold", Range(0, 1)) = 0.35
+        _NoiseThreshold ("Base Noise Threshold", Range(0, 1)) = 0.35
+        _Coverage ("Coverage", Range(0, 1)) = 0.80
+        _CloudBase ("Cloud Base", Range(0, 0.95)) = 0.08
+        _CloudTop ("Cloud Top", Range(0.05, 1)) = 0.90
+        _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
+        _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
+        _WindDirection ("Local Wind Direction", Vector) = (1, 0, 0.5, 0)
     }
 
     SubShader
@@ -55,6 +61,12 @@ Shader "Custom/VolumetricFog"
                 float _NoiseScale;
                 float _NoiseSpeed;
                 float _NoiseThreshold;
+                float _Coverage;
+                float _CloudBase;
+                float _CloudTop;
+                float _DetailScale;
+                float _Erosion;
+                float4 _WindDirection;
             CBUFFER_END
 
             Varyings vert(Attributes input)
@@ -67,53 +79,63 @@ Shader "Custom/VolumetricFog"
                 return output;
             }
 
-            float hash31(float3 p)
+            float3 HashCell(float3 cell)
             {
-                return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453);
+                float3 hash = frac(cell * float3(0.1031, 0.1030, 0.0973));
+                hash += dot(hash, hash.yxz + 33.33);
+                return frac((hash.xxy + hash.yxx) * hash.zyx);
             }
 
-            float valueNoise3D(float3 p)
+            float PerlinNoise(float3 position)
             {
-                float3 i = floor(p);
-                float3 f = frac(p);
+                float3 cell = floor(position);
+                float3 offset = frac(position);
+                float3 fade = offset * offset * offset * (offset * (offset * 6.0 - 15.0) + 10.0);
+                float noise = 0.0;
 
-                f = f * f * (3.0 - 2.0 * f);
+                [unroll]
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    float3 vertex = float3(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1);
+                    float3 gradient = HashCell(cell + vertex) * 2.0 - 1.0;
+                    float3 weight = lerp(1.0 - fade, fade, vertex);
+                    noise += weight.x * weight.y * weight.z * dot(gradient, offset - vertex);
+                }
 
-                float n000 = hash31(i + float3(0, 0, 0));
-                float n100 = hash31(i + float3(1, 0, 0));
-                float n010 = hash31(i + float3(0, 1, 0));
-                float n110 = hash31(i + float3(1, 1, 0));
-
-                float n001 = hash31(i + float3(0, 0, 1));
-                float n101 = hash31(i + float3(1, 0, 1));
-                float n011 = hash31(i + float3(0, 1, 1));
-                float n111 = hash31(i + float3(1, 1, 1));
-
-                float nx00 = lerp(n000, n100, f.x);
-                float nx10 = lerp(n010, n110, f.x);
-                float nx01 = lerp(n001, n101, f.x);
-                float nx11 = lerp(n011, n111, f.x);
-
-                float nxy0 = lerp(nx00, nx10, f.y);
-                float nxy1 = lerp(nx01, nx11, f.y);
-
-                return lerp(nxy0, nxy1, f.z);
+                return saturate(0.5 + noise);
             }
 
-            float fbm(float3 p)
+            float PerlinFbm(float3 position)
             {
                 float value = 0.0;
                 float amplitude = 0.5;
-
                 [unroll]
-                for (int i = 0; i < 4; i++)
+                for (int octave = 0; octave < 3; octave++)
                 {
-                    value += amplitude * valueNoise3D(p);
-                    p *= 2.0;
+                    value += amplitude * PerlinNoise(position);
+                    position = position * 2.03 + float3(5.2, 1.3, 8.7);
                     amplitude *= 0.5;
                 }
 
-                return value;
+                return value / 0.875;
+            }
+
+            float WorleyNoise(float3 position)
+            {
+                float3 cell = floor(position);
+                float3 offset = frac(position);
+                float distanceSquared = 3.0;
+
+                [loop]
+                for (int index = 0; index < 27; index++)
+                {
+                    float3 neighbor = float3(index % 3, (index / 3) % 3, index / 9) - 1.0;
+                    float3 feature = 0.2 + 0.6 * HashCell(cell + neighbor);
+                    float3 delta = neighbor + feature - offset;
+                    distanceSquared = min(distanceSquared, dot(delta, delta));
+                }
+
+                return saturate(sqrt(distanceSquared));
             }
 
             // The proxy is a unit cube. Keep the transformed direction unnormalized
@@ -143,10 +165,32 @@ Shader "Custom/VolumetricFog"
 
             float SampleDensity(float3 positionOS)
             {
-                float shape = smoothstep(0.0, 0.7, 1.0 - length(positionOS * 1.3));
-                float3 wind = float3(1.0, 0.0, 0.5) * (_Time.y * _NoiseSpeed);
-                float noise = fbm(positionOS * _NoiseScale + wind);
-                return _Density * shape * smoothstep(_NoiseThreshold, _NoiseThreshold + 0.15, noise);
+                if (_Coverage <= 0.0)
+                    return 0.0;
+
+                float height = positionOS.y + 0.5;
+                float layerHeight = max(0.05, _CloudTop - _CloudBase);
+                float layer = (height - _CloudBase) / layerHeight;
+                float heightMask = smoothstep(0.0, 0.22, layer) * (1.0 - smoothstep(0.55, 1.0, layer));
+                float horizontalMask = 1.0 - smoothstep(0.24, 0.5, length(positionOS.xz));
+                float envelope = heightMask * horizontalMask;
+                if (envelope <= 0.0)
+                    return 0.0;
+
+                float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
+                float3 noisePosition = (positionOS - wind * (_Time.y * _NoiseSpeed)) * _NoiseScale;
+                float baseNoise = PerlinFbm(noisePosition);
+                float threshold = lerp(0.86, _NoiseThreshold, _Coverage);
+                float shape = smoothstep(threshold, threshold + 0.22, baseNoise) * envelope;
+                if (shape <= 0.0)
+                    return 0.0;
+
+                if (_Erosion > 0.0)
+                {
+                    float detail = WorleyNoise(noisePosition * _DetailScale + float3(9.1, 4.2, 1.7));
+                    shape = saturate(shape - _Erosion * detail * (1.0 - shape));
+                }
+                return _Density * shape;
             }
 
             half4 frag(Varyings input) : SV_Target
