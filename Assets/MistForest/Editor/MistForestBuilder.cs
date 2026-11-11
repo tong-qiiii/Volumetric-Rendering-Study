@@ -114,6 +114,7 @@ public static class MistForestBuilder
             camera.allowHDR=true; camera.GetUniversalAdditionalCameraData().requiresDepthTexture=true;
             camera.GetUniversalAdditionalCameraData().renderPostProcessing=true;
             cameraObject.AddComponent<AudioListener>();
+            cameraObject.AddComponent<ForestExplorer>();
             var sunObject=Group("Sun through canopy"); var sun=sunObject.AddComponent<Light>(); sun.type=LightType.Directional;
             sun.color=new Color(.91f,.96f,1f); sun.intensity=1.35f; sun.shadows=LightShadows.Soft;
             sun.shadowBias=.03f; sun.shadowNormalBias=.25f; sunObject.transform.rotation=Quaternion.Euler(48,-32,0);

@@ -50,3 +50,7 @@ The refined preset uses stronger direct-light attenuation and cooler sky fill. [
 ## Next milestone
 
 W14 will compare GPU time and visual quality across view step lengths, light step counts, and render resolutions.
+
+## Third-person forest exploration
+
+Open MistForest and enter Play, then click inside Game view to capture the mouse. WASD walks relative to the camera; Shift runs; Space jumps; the mouse rotates the follow camera; R returns to the entrance; Escape releases the cursor. A simple procedural explorer model represents the player. The floor and stones use mesh collisions and trunks use approximate capsule collisions. The camera retracts against obstacles. The saved edit-mode camera and report capture views are unchanged.
