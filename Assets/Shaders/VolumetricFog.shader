@@ -27,6 +27,8 @@ Shader "Custom/VolumetricFog"
         _SkyFillStrength ("Sky Fill Strength", Range(0, 1)) = 0
         [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
         _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
+        [IntRange] _ViewSteps ("View Step Budget", Range(16,128)) = 128
+        [IntRange] _SkySteps ("Sky Step Budget", Range(1,3)) = 3
         _CloudBounce ("Diffuse Light Fill", Range(0, 1)) = 0
         [ToggleUI] _ForestFog ("Forest Height Fog", Float) = 0
         _FogHeightFalloff ("Forest Height Falloff", Range(0.05, 2)) = 0.3
@@ -106,6 +108,8 @@ Shader "Custom/VolumetricFog"
                 float _LightSteps;
                 float _LightExtinction;
                 float _CloudBounce;
+                float _ViewSteps;
+                float _SkySteps;
                 float _ForestFog;
                 float _FogHeightFalloff;
                 float _SceneShadows;
@@ -362,7 +366,7 @@ Shader "Custom/VolumetricFog"
                 if (exit <= entry)
                     return 0;
 
-                const int maxSamples = 128;
+                int maxSamples = (int)clamp(_ViewSteps,16.0,128.0);
                 int sampleCount = (int)clamp(ceil((exit - entry) / max(_StepSize, 0.001)), 1.0, (float)maxSamples);
                 float stepLength = (exit - entry) / sampleCount;
                 Light mainLight = GetMainLight();
@@ -374,7 +378,7 @@ Shader "Custom/VolumetricFog"
                 int lightSteps = _LightExtinction > 0.0 ? (int)clamp(_LightSteps, 0.0, 8.0) : 0;
                 float3 skyDirOS = TransformWorldToObjectDir(float3(0.0, 1.0, 0.0), false);
                 float3 skyColor = _SkyFillColor.rgb * _SkyFillStrength;
-                const int skySteps = 3;
+                int skySteps = (int)clamp(_SkySteps,1.0,3.0);
                 float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
                 float3 windOffset = wind * (_Time.y * _NoiseSpeed);
                 float transmittance = 1.0;

@@ -1,0 +1,2 @@
+Unity 6000.6.0f1; NVIDIA GeForce RTX 4070 Laptop GPU; Direct3D11
+1280x720. Preview scene, fixed eye-level camera, frozen noise. Three warmups then eight measured renders per preset. Wall time includes CPU render submission, GPU completion and synchronous ReadPixels/Apply. NOT GPU-only time or live gameplay FPS. Presets measured sequentially. Shader error check passed.

@@ -51,6 +51,12 @@ The refined preset uses stronger direct-light attenuation and cooler sky fill. [
 
 W14 will compare GPU time and visual quality across view step lengths, light step counts, and render resolutions.
 
-## Third-person forest exploration
+## First-person forest exploration and sampling budgets
 
-Open MistForest and enter Play, then click inside Game view to capture the mouse. WASD walks relative to the camera; Shift runs; Space jumps; the mouse rotates the follow camera; R returns to the entrance; Escape releases the cursor. A simple procedural explorer model represents the player. The floor and stones use mesh collisions and trunks use approximate capsule collisions. The camera retracts against obstacles. The saved edit-mode camera and report capture views are unchanged.
+Open MistForest, enter Play, then click Game view. WASD walks, Shift runs, Space jumps, the mouse looks around, R resets to the entrance, and Escape releases the cursor. The camera sits at eye height; there is no third-person avatar. The ground uses mesh collision, stones use approximate boxes and trunks use capsules.
+
+F2 switches High (128 view / 6 sun / 3 sky), Balanced (48 / 3 / 1, default) and Fast (32 / 2 / 1). The on-screen frame-time display is a smoothed live value. Sample budgets are material properties; other cloud materials retain their original defaults.
+
+**Cloud Study > Benchmark Forest Sampling** writes same-camera screenshots and timings to `Docs/MistForest/Performance`. In the recorded 1280 x 720 editor experiment, median synchronous render-plus-readback times were 132.905 ms (High), 66.955 ms (view budget only), 39.169 ms (Balanced), and 8.007 ms (fog off). This is not GPU-only time or gameplay FPS. Fast was not measured. Each preset used three warmups and eight measured samples, in sequential order. Dynamic camera motion and collision edge cases still need live validation.
+
+The updated eight-page midterm report includes the optimization steps, measurements, image comparison and limitations.

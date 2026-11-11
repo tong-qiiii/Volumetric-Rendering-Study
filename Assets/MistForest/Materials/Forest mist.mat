@@ -42,7 +42,9 @@ Material:
     - _FogHeightFalloff: 0.27
     - _ForestFog: 1
     - _LightExtinction: 0.8
-    - _LightSteps: 6
+    - _LightSteps: 3
+    - _ViewSteps: 48
+    - _SkySteps: 1
     - _NoiseScale: 3
     - _NoiseSpeed: 0.012
     - _NoiseThreshold: 0.35

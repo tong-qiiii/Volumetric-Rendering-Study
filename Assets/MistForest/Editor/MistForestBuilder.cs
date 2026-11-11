@@ -343,7 +343,7 @@ public static class MistForestBuilder
         mat.SetFloat("_ForestFog",1);mat.SetFloat("_SceneShadows",1);mat.SetFloat("_Density",.115f);mat.SetFloat("_Coverage",1);
         mat.SetFloat("_FogHeightFalloff",.27f);mat.SetFloat("_StepSize",.1f);mat.SetFloat("_NoiseSpeed",.012f);mat.SetFloat("_Erosion",.16f);mat.SetFloat("_DetailScale",3.1f);
         mat.SetFloat("_Anisotropy",.46f);mat.SetFloat("_SecondaryAnisotropy",-.18f);mat.SetFloat("_PhaseBlend",.28f);
-        mat.SetFloat("_LightSteps",6);mat.SetFloat("_LightExtinction",.8f);mat.SetFloat("_CloudBounce",.14f);
+        mat.SetFloat("_ViewSteps",48);mat.SetFloat("_SkySteps",1);mat.SetFloat("_LightSteps",3);mat.SetFloat("_LightExtinction",.8f);mat.SetFloat("_CloudBounce",.14f);
         mat.SetFloat("_AmbientStrength",.14f);mat.SetFloat("_SkyFillStrength",.46f);mat.SetColor("_SkyFillColor",new Color(.53f,.70f,.72f));
         mat.SetColor("_FogColor",new Color(.59f,.72f,.70f));mat.SetVector("_WindDirection",new Vector4(1,0,.3f,0));EditorUtility.SetDirty(mat);
         var go=Primitive("Forest volume - select material to tune fog",PrimitiveType.Cube,mat,new Vector3(0,9,24),new Vector3(76,24,100));

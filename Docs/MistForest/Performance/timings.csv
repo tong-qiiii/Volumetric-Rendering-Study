@@ -1,0 +1,5 @@
+preset,view_steps,sun_steps,sky_steps,median_ms,min_ms,max_ms
+baseline,128,6,3,132.905,128.389,135.372
+view48,48,6,3,66.955,65.092,71.145
+balanced,48,3,1,39.169,35.871,64.632
+fog_off,48,3,1,8.007,7.286,10.392
