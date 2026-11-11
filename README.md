@@ -35,6 +35,8 @@ Disable **Use Weather Map** to restore the procedural cloud layout, or set **Edg
 
 The camera, cloud geometry, and wind are fixed for each before/after pair. [Front light](Docs/CloudValleyLighting/01-front-comparison.png) · [Side light](Docs/CloudValleyLighting/02-side-comparison.png) · [Back light](Docs/CloudValleyLighting/03-back-comparison.png) · [Sky fill on/off](Docs/CloudValleyLighting/04-sky-fill-isolation.png)
 
+The refined preset uses stronger direct-light attenuation and cooler sky fill. [Front close-up](Docs/CloudValleyLighting/Refined/01-front-refined.png) · [Side close-up](Docs/CloudValleyLighting/Refined/02-side-refined.png) · [Back close-up](Docs/CloudValleyLighting/Refined/03-back-refined.png) · [Sky fill on/off](Docs/CloudValleyLighting/Refined/04-back-sky-fill.png)
+
 ## Next milestone
 
 W14 will compare GPU time and visual quality across view step lengths, light step counts, and render resolutions.
