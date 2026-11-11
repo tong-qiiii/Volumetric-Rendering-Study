@@ -20,7 +20,11 @@ Shader "Custom/VolumetricFog"
         _WindDirection ("Local Wind Direction", Vector) = (1, 0, 0.5, 0)
 
         _Anisotropy ("Scattering Anisotropy", Range(-0.8, 0.8)) = 0.42
+        _SecondaryAnisotropy ("Secondary Anisotropy", Range(-0.8, 0.8)) = -0.22
+        _PhaseBlend ("Secondary Phase Weight", Range(0, 1)) = 0
         _AmbientStrength ("Ambient Strength", Range(0, 1)) = 0.32
+        _SkyFillColor ("Sky Fill Color", Color) = (0.68, 0.81, 1.0, 1.0)
+        _SkyFillStrength ("Sky Fill Strength", Range(0, 1)) = 0
         [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
         _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
         _CloudBounce ("Diffuse Light Fill", Range(0, 1)) = 0
@@ -84,7 +88,11 @@ Shader "Custom/VolumetricFog"
                 float _UseWeatherMap;
                 float4 _WindDirection;
                 float _Anisotropy;
+                float _SecondaryAnisotropy;
+                float _PhaseBlend;
                 float _AmbientStrength;
+                float4 _SkyFillColor;
+                float _SkyFillStrength;
                 float _LightSteps;
                 float _LightExtinction;
                 float _CloudBounce;
@@ -260,33 +268,33 @@ Shader "Custom/VolumetricFog"
                 return _Density * shape;
             }
 
-            float RelativeHenyeyGreenstein(float cosTheta)
+            float RelativeHenyeyGreenstein(float cosTheta, float anisotropy)
             {
-                float g = clamp(_Anisotropy, -0.8, 0.8);
+                float g = clamp(anisotropy, -0.8, 0.8);
                 float denominator = max(1.0 + g * g - 2.0 * g * cosTheta, 0.001);
                 // Divide the phase function by the isotropic value, 1/(4*pi).
                 return (1.0 - g * g) / (denominator * sqrt(denominator));
             }
 
-            float SunTransmittance(float3 positionOS, float3 lightDirOS, float3 windOffset, int steps)
+            float CloudOpticalDepth(float3 positionOS, float3 sampleDirOS, float3 windOffset, int steps)
             {
-                if (steps == 0 || _LightExtinction <= 0.0)
-                    return 1.0;
+                if (steps == 0)
+                    return 0.0;
 
                 float entry;
                 float exit;
-                if (!IntersectVolume(positionOS, lightDirOS, entry, exit) || exit <= 0.0)
-                    return 1.0;
+                if (!IntersectVolume(positionOS, sampleDirOS, entry, exit) || exit <= 0.0)
+                    return 0.0;
 
                 float stepLength = exit / steps;
                 float opticalDepth = 0.0;
                 [loop]
                 for (int i = 0; i < steps; i++)
                 {
-                    float3 sampleOS = positionOS + lightDirOS * ((i + 0.5) * stepLength);
+                    float3 sampleOS = positionOS + sampleDirOS * ((i + 0.5) * stepLength);
                     opticalDepth += SampleDensity(sampleOS, windOffset, false) * stepLength;
                 }
-                return exp(-opticalDepth * _LightExtinction);
+                return opticalDepth;
             }
 
             half4 frag(Varyings input) : SV_Target
@@ -324,9 +332,14 @@ Shader "Custom/VolumetricFog"
                 float stepLength = (exit - entry) / sampleCount;
                 Light mainLight = GetMainLight();
                 float3 lightDirOS = TransformWorldToObjectDir(mainLight.direction, false);
-                float phase = RelativeHenyeyGreenstein(clamp(dot(rayDir, mainLight.direction), -1.0, 1.0));
+                float cosTheta = clamp(dot(rayDir, mainLight.direction), -1.0, 1.0);
+                float phase = RelativeHenyeyGreenstein(cosTheta, _Anisotropy);
+                phase = lerp(phase, RelativeHenyeyGreenstein(cosTheta, _SecondaryAnisotropy), _PhaseBlend);
                 float3 sunColor = mainLight.color * mainLight.distanceAttenuation;
-                int lightSteps = (int)clamp(_LightSteps, 0.0, 8.0);
+                int lightSteps = _LightExtinction > 0.0 ? (int)clamp(_LightSteps, 0.0, 8.0) : 0;
+                float3 skyDirOS = TransformWorldToObjectDir(float3(0.0, 1.0, 0.0), false);
+                float3 skyColor = _SkyFillColor.rgb * _SkyFillStrength;
+                const int skySteps = 3;
                 float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
                 float3 windOffset = wind * (_Time.y * _NoiseSpeed);
                 float transmittance = 1.0;
@@ -341,11 +354,19 @@ Shader "Custom/VolumetricFog"
                     if (density <= 0.0)
                         continue;
 
-                    float sunTransmittance = SunTransmittance(sampleOS, lightDirOS, windOffset, lightSteps);
+                    float sunDepth = CloudOpticalDepth(sampleOS, lightDirOS, windOffset, lightSteps);
+                    float sunTransmittance = exp(-sunDepth * _LightExtinction);
                     // A broader, less attenuated lobe approximates light scattered into the cloud interior.
                     float fill = _CloudBounce * max(0.0, sqrt(sunTransmittance) - sunTransmittance);
                     float lighting = phase * sunTransmittance + fill;
-                    float3 sourceColor = _FogColor.rgb * (_AmbientStrength + sunColor * lighting);
+                    float3 ambient = _AmbientStrength;
+                    if (_SkyFillStrength > 0.0)
+                    {
+                        // An upward trace approximates sky occlusion, without integrating the whole hemisphere.
+                        float skyDepth = CloudOpticalDepth(sampleOS, skyDirOS, windOffset, skySteps);
+                        ambient += skyColor * exp(-0.65 * skyDepth);
+                    }
+                    float3 sourceColor = _FogColor.rgb * (ambient + sunColor * lighting);
                     float stepTransmittance = exp(-density * stepLength);
                     accumulatedColor += transmittance * (1.0 - stepTransmittance) * sourceColor;
                     transmittance *= stepTransmittance;

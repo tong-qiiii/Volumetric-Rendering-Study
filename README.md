@@ -29,6 +29,12 @@ Disable **Use Weather Map** to restore the procedural cloud layout, or set **Edg
 
 [Original](Docs/CloudValleyWeather/01-original.png) · [Weather map](Docs/CloudValleyWeather/02-weather-map.png) · [Weather map with erosion](Docs/CloudValleyWeather/03-weather-map-erosion.png)
 
+## CloudValley lighting
+
+`ValleyClouds` blends a forward and a broader backward Henyey–Greenstein lobe. **Secondary Phase Weight** controls the blend. **Sky Fill Color** and **Sky Fill Strength** control the cool ambient contribution. The shader estimates sky occlusion with three density samples in the world-up direction and keeps the existing sun trace for direct lighting.
+
+The camera, cloud geometry, and wind are fixed for each before/after pair. [Front light](Docs/CloudValleyLighting/01-front-comparison.png) · [Side light](Docs/CloudValleyLighting/02-side-comparison.png) · [Back light](Docs/CloudValleyLighting/03-back-comparison.png) · [Sky fill on/off](Docs/CloudValleyLighting/04-sky-fill-isolation.png)
+
 ## Next milestone
 
 W14 will compare GPU time and visual quality across view step lengths, light step counts, and render resolutions.
