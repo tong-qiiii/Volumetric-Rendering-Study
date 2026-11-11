@@ -15,6 +15,11 @@ Shader "Custom/VolumetricFog"
         _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
         _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
         _WindDirection ("Local Wind Direction", Vector) = (1, 0, 0.5, 0)
+
+        _Anisotropy ("Scattering Anisotropy", Range(-0.8, 0.8)) = 0.42
+        _AmbientStrength ("Ambient Strength", Range(0, 1)) = 0.32
+        [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
+        _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
     }
 
     SubShader
@@ -42,6 +47,8 @@ Shader "Custom/VolumetricFog"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
@@ -67,6 +74,10 @@ Shader "Custom/VolumetricFog"
                 float _DetailScale;
                 float _Erosion;
                 float4 _WindDirection;
+                float _Anisotropy;
+                float _AmbientStrength;
+                float _LightSteps;
+                float _LightExtinction;
             CBUFFER_END
 
             Varyings vert(Attributes input)
@@ -74,6 +85,9 @@ Shader "Custom/VolumetricFog"
                 Varyings output;
 
                 output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
+                // Use the proxy only for pixel coverage. The ray interval and
+                // scene depth determine visibility, even if the box exit is beyond the far plane.
+                output.positionHCS.z = 0.5 * output.positionHCS.w;
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
 
                 return output;
@@ -163,7 +177,7 @@ Shader "Custom/VolumetricFog"
                 return exit > entry;
             }
 
-            float SampleDensity(float3 positionOS)
+            float SampleDensity(float3 positionOS, float3 windOffset, bool sampleDetail)
             {
                 if (_Coverage <= 0.0)
                     return 0.0;
@@ -177,15 +191,14 @@ Shader "Custom/VolumetricFog"
                 if (envelope <= 0.0)
                     return 0.0;
 
-                float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
-                float3 noisePosition = (positionOS - wind * (_Time.y * _NoiseSpeed)) * _NoiseScale;
+                float3 noisePosition = (positionOS - windOffset) * _NoiseScale;
                 float baseNoise = PerlinFbm(noisePosition);
                 float threshold = lerp(0.86, _NoiseThreshold, _Coverage);
                 float shape = smoothstep(threshold, threshold + 0.22, baseNoise) * envelope;
                 if (shape <= 0.0)
                     return 0.0;
 
-                if (_Erosion > 0.0)
+                if (sampleDetail && _Erosion > 0.0)
                 {
                     float detail = WorleyNoise(noisePosition * _DetailScale + float3(9.1, 4.2, 1.7));
                     shape = saturate(shape - _Erosion * detail * (1.0 - shape));
@@ -193,12 +206,42 @@ Shader "Custom/VolumetricFog"
                 return _Density * shape;
             }
 
+            float RelativeHenyeyGreenstein(float cosTheta)
+            {
+                float g = clamp(_Anisotropy, -0.8, 0.8);
+                float denominator = max(1.0 + g * g - 2.0 * g * cosTheta, 0.001);
+                // Divide the phase function by the isotropic value, 1/(4*pi).
+                return (1.0 - g * g) / (denominator * sqrt(denominator));
+            }
+
+            float SunTransmittance(float3 positionOS, float3 lightDirOS, float3 windOffset, int steps)
+            {
+                if (steps == 0 || _LightExtinction <= 0.0)
+                    return 1.0;
+
+                float entry;
+                float exit;
+                if (!IntersectVolume(positionOS, lightDirOS, entry, exit) || exit <= 0.0)
+                    return 1.0;
+
+                float stepLength = exit / steps;
+                float opticalDepth = 0.0;
+                [loop]
+                for (int i = 0; i < steps; i++)
+                {
+                    float3 sampleOS = positionOS + lightDirOS * ((i + 0.5) * stepLength);
+                    opticalDepth += SampleDensity(sampleOS, windOffset, false) * stepLength;
+                }
+                return exp(-opticalDepth * _LightExtinction);
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
                 float3 cameraForward = GetViewForwardDir();
                 float3 originWS = GetCameraPositionWS();
                 float3 rayDir = normalize(input.positionWS - originWS);
-                if (IsPerspectiveProjection() == false)
+                bool perspective = IsPerspectiveProjection();
+                if (!perspective)
                 {
                     rayDir = cameraForward;
                     originWS = input.positionWS - rayDir * dot(input.positionWS - originWS, rayDir);
@@ -213,7 +256,12 @@ Shader "Custom/VolumetricFog"
 
                 float forwardProjection = dot(rayDir, cameraForward);
                 entry = max(entry, _ProjectionParams.y / forwardProjection);
-                exit = min(exit, _ProjectionParams.z / forwardProjection);
+                float2 screenUV = GetNormalizedScreenSpaceUV(input.positionHCS);
+                float rawDepth = SampleSceneDepth(screenUV);
+                float eyeDepth = perspective
+                    ? LinearEyeDepth(rawDepth, _ZBufferParams)
+                    : LinearDepthToEyeDepth(rawDepth);
+                exit = min(exit, min(eyeDepth, _ProjectionParams.z) / forwardProjection);
                 if (exit <= entry)
                     return 0;
 
@@ -221,8 +269,12 @@ Shader "Custom/VolumetricFog"
                 int sampleCount = (int)clamp(ceil((exit - entry) / max(_StepSize, 0.001)), 1.0, (float)maxSamples);
                 float stepLength = (exit - entry) / sampleCount;
                 Light mainLight = GetMainLight();
-                float phase = 0.5 + 0.5 * dot(rayDir, mainLight.direction);
-                float3 sourceColor = _FogColor.rgb * mainLight.color * phase;
+                float3 lightDirOS = TransformWorldToObjectDir(mainLight.direction, false);
+                float phase = RelativeHenyeyGreenstein(clamp(dot(rayDir, mainLight.direction), -1.0, 1.0));
+                float3 directColor = mainLight.color * (mainLight.distanceAttenuation * phase);
+                int lightSteps = (int)clamp(_LightSteps, 0.0, 8.0);
+                float3 wind = _WindDirection.xyz / max(1e-4, length(_WindDirection.xyz));
+                float3 windOffset = wind * (_Time.y * _NoiseSpeed);
                 float transmittance = 1.0;
                 float3 accumulatedColor = 0.0;
 
@@ -230,7 +282,13 @@ Shader "Custom/VolumetricFog"
                 for (int i = 0; i < sampleCount; i++)
                 {
                     float distanceAlongRay = entry + (i + 0.5) * stepLength;
-                    float density = SampleDensity(originOS + directionOS * distanceAlongRay);
+                    float3 sampleOS = originOS + directionOS * distanceAlongRay;
+                    float density = SampleDensity(sampleOS, windOffset, true);
+                    if (density <= 0.0)
+                        continue;
+
+                    float sunTransmittance = SunTransmittance(sampleOS, lightDirOS, windOffset, lightSteps);
+                    float3 sourceColor = _FogColor.rgb * (_AmbientStrength + directColor * sunTransmittance);
                     float stepTransmittance = exp(-density * stepLength);
                     accumulatedColor += transmittance * (1.0 - stepTransmittance) * sourceColor;
                     transmittance *= stepTransmittance;
