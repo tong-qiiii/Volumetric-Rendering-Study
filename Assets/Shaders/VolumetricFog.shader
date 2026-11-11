@@ -22,12 +22,14 @@ Shader "Custom/VolumetricFog"
 
         Pass
         {
-            Blend SrcAlpha OneMinusSrcAlpha
+            Blend One OneMinusSrcAlpha
             ZWrite Off
-            Cull Back
+            Cull Front
+            ZTest Always
 
             HLSLPROGRAM
 
+            #pragma target 3.5
             #pragma vertex vert
             #pragma fragment frag
 
@@ -114,54 +116,86 @@ Shader "Custom/VolumetricFog"
                 return value;
             }
 
+            // The proxy is a unit cube. Keep the transformed direction unnormalized
+            // so that the interval and sample lengths remain in world units.
+            bool IntersectVolume(float3 origin, float3 direction, out float entry, out float exit)
+            {
+                entry = -1e20;
+                exit = 1e20;
+                [unroll]
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    if (abs(direction[axis]) < 1e-8)
+                    {
+                        if (abs(origin[axis]) > 0.5)
+                            return false;
+                        continue;
+                    }
+
+                    float a = (-0.5 - origin[axis]) / direction[axis];
+                    float b = (0.5 - origin[axis]) / direction[axis];
+                    entry = max(entry, min(a, b));
+                    exit = min(exit, max(a, b));
+                }
+
+                return exit > entry;
+            }
+
+            float SampleDensity(float3 positionOS)
+            {
+                float shape = smoothstep(0.0, 0.7, 1.0 - length(positionOS * 1.3));
+                float3 wind = float3(1.0, 0.0, 0.5) * (_Time.y * _NoiseSpeed);
+                float noise = fbm(positionOS * _NoiseScale + wind);
+                return _Density * shape * smoothstep(_NoiseThreshold, _NoiseThreshold + 0.15, noise);
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
-                Light mainLight = GetMainLight();
+                float3 cameraForward = GetViewForwardDir();
+                float3 originWS = GetCameraPositionWS();
+                float3 rayDir = normalize(input.positionWS - originWS);
+                if (IsPerspectiveProjection() == false)
+                {
+                    rayDir = cameraForward;
+                    originWS = input.positionWS - rayDir * dot(input.positionWS - originWS, rayDir);
+                }
 
-                float3 rayDir = normalize(input.positionWS - _WorldSpaceCameraPos);
-                float3 currentPos = input.positionWS + rayDir * 0.001;
+                float3 originOS = TransformWorldToObject(originWS);
+                float3 directionOS = TransformWorldToObjectDir(rayDir, false);
+                float entry;
+                float exit;
+                if (!IntersectVolume(originOS, directionOS, entry, exit))
+                    return 0;
+
+                float forwardProjection = dot(rayDir, cameraForward);
+                entry = max(entry, _ProjectionParams.y / forwardProjection);
+                exit = min(exit, _ProjectionParams.z / forwardProjection);
+                if (exit <= entry)
+                    return 0;
+
+                const int maxSamples = 128;
+                int sampleCount = (int)clamp(ceil((exit - entry) / max(_StepSize, 0.001)), 1.0, (float)maxSamples);
+                float stepLength = (exit - entry) / sampleCount;
+                Light mainLight = GetMainLight();
+                float phase = 0.5 + 0.5 * dot(rayDir, mainLight.direction);
+                float3 sourceColor = _FogColor.rgb * mainLight.color * phase;
                 float transmittance = 1.0;
                 float3 accumulatedColor = 0.0;
 
                 [loop]
-                for (int i = 0; i < 128; i++)
+                for (int i = 0; i < sampleCount; i++)
                 {
-                    float3 positionOS = TransformWorldToObject(currentPos);
-                    if (any(abs(positionOS) > 0.5)) { break; }
-
-                    float distanceFromCenter = length(positionOS * 1.3);
-                    float shape = saturate(1.0 - distanceFromCenter);
-                    shape = smoothstep(0.0, 0.7, shape);
-
-                    float3 noisePos = positionOS * _NoiseScale;
-                    noisePos += float3(_Time.y * _NoiseSpeed, 0.0, _Time.y * _NoiseSpeed * 0.5);
-
-                    float noise = fbm(noisePos);
-                    float cloud = smoothstep(_NoiseThreshold, _NoiseThreshold + 0.15, noise);
-                    float density = _Density * shape * cloud;
-
-
-                    float stepTransmittance = exp(-density * _StepSize);
-                    float scatteringWeight = transmittance * (1.0 - stepTransmittance);
-
-                    float cosTheta = dot(rayDir, mainLight.direction);
-                    float phase = 0.5 + 0.5 * cosTheta;
-
-                    accumulatedColor += scatteringWeight * _FogColor.rgb * mainLight.color * phase;
+                    float distanceAlongRay = entry + (i + 0.5) * stepLength;
+                    float density = SampleDensity(originOS + directionOS * distanceAlongRay);
+                    float stepTransmittance = exp(-density * stepLength);
+                    accumulatedColor += transmittance * (1.0 - stepTransmittance) * sourceColor;
                     transmittance *= stepTransmittance;
-
-
-                    if (transmittance < 0.01) { break; }
-
-                    currentPos += rayDir * _StepSize;
+                    if (transmittance < 0.01)
+                        break;
                 }
 
-                float alpha = 1.0 - transmittance;
-                return half4(accumulatedColor, alpha);
+                return half4(accumulatedColor, 1.0 - transmittance);
             }
-
-
-
             ENDHLSL
         }
     }
