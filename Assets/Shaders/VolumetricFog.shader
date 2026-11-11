@@ -15,6 +15,8 @@ Shader "Custom/VolumetricFog"
         _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
         _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
         _CloudBillow ("Billowing Shape", Range(0, 1)) = 0
+        [ToggleUI] _UseWeatherMap ("Use Weather Map", Float) = 0
+        [NoScaleOffset] _WeatherMap ("Weather Map (R Coverage, G Top Height, B Base Height)", 2D) = "black" {}
         _WindDirection ("Local Wind Direction", Vector) = (1, 0, 0.5, 0)
 
         _Anisotropy ("Scattering Anisotropy", Range(-0.8, 0.8)) = 0.42
@@ -62,6 +64,9 @@ Shader "Custom/VolumetricFog"
                 float3 positionWS : TEXCOORD0;
             };
 
+            TEXTURE2D(_WeatherMap);
+            SAMPLER(sampler_WeatherMap);
+
             CBUFFER_START(UnityPerMaterial)
                 half4 _FogColor;
                 float _Density;
@@ -76,6 +81,7 @@ Shader "Custom/VolumetricFog"
                 float _DetailScale;
                 float _Erosion;
                 float _CloudBillow;
+                float _UseWeatherMap;
                 float4 _WindDirection;
                 float _Anisotropy;
                 float _AmbientStrength;
@@ -200,7 +206,24 @@ Shader "Custom/VolumetricFog"
 
                 float threshold = lerp(0.86, _NoiseThreshold, _Coverage);
                 float3 noisePosition = advectedPosition * _NoiseScale;
-                if (_CloudBillow > 0.0)
+                if (_UseWeatherMap > 0.5)
+                {
+                    // The map anchors cloud groups in the valley. Wind advects the 3D noise within them.
+                    float3 weather = SAMPLE_TEXTURE2D_LOD(_WeatherMap, sampler_WeatherMap, positionOS.xz + 0.5, 0).rgb;
+                    float coverage = smoothstep(0.03, 0.72, weather.r);
+                    if (coverage <= 0.0)
+                        return 0.0;
+
+                    float baseHeight = weather.b;
+                    float thickness = max(0.05, weather.g - baseHeight) * lerp(0.57, 1.0, coverage);
+                    float relativeHeight = (layer - baseHeight) / thickness;
+                    heightMask = smoothstep(0.0, 0.20, relativeHeight)
+                        * (1.0 - smoothstep(0.46, 1.0, relativeHeight));
+                    horizontalMask *= coverage;
+                    threshold += lerp(0.15, -0.065, coverage);
+                    noisePosition *= float3(1.85, 1.12, 1.15);
+                }
+                else if (_CloudBillow > 0.0)
                 {
                     // A slower 2D field controls where towers form and how high they rise.
                     float weather = PerlinNoise(float3(advectedPosition.xz * float2(4.9, 3.1), 7.37));

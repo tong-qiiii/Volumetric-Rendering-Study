@@ -21,6 +21,14 @@ Open `Assets/Scenes/MainScene.unity` and enter Play mode. Select the `FogVolume`
 
 The light march samples the base cloud density, omitting Worley erosion on that secondary ray. The view march still samples the detailed density. Scene depth comes from opaque geometry. The W12 milestone does not include GPU timing or quality benchmarks.
 
+## CloudValley weather map
+
+Open `Assets/Scenes/CloudValley.unity` to see three cloud groups. The `ValleyClouds` material uses `ValleyWeatherMap.png` as linear data in the volume's local XZ plane. Red controls local coverage, green the normalized cloud top, and blue the normalized cloud base within the Cloud Base–Cloud Top range. Black coverage leaves the sky clear. The weather map fixes the cloud group layout while wind moves the 3D noise inside the groups.
+
+Disable **Use Weather Map** to restore the procedural cloud layout, or set **Edge Erosion** to 0 to inspect the weather map silhouette without Worley detail.
+
+[Original](Docs/CloudValleyWeather/01-original.png) · [Weather map](Docs/CloudValleyWeather/02-weather-map.png) · [Weather map with erosion](Docs/CloudValleyWeather/03-weather-map-erosion.png)
+
 ## Next milestone
 
 W14 will compare GPU time and visual quality across view step lengths, light step counts, and render resolutions.
