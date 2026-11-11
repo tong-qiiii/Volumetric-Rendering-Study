@@ -1,0 +1,25 @@
+{
+  "method": "8-bit display RGB weighted luma; not linear radiance or physical ground truth",
+  "trunk_roi_xywh": [
+    80,
+    200,
+    100,
+    200
+  ],
+  "lighting_roi_xywh": [
+    680,
+    160,
+    140,
+    220
+  ],
+  "trunk_luma": {
+    "01-forest-final": 67.3,
+    "02-fog-off": 42.36,
+    "06-depth-clip-disabled": 104.63
+  },
+  "lighting_luma": {
+    "01-forest-final": 102.73,
+    "03-tree-shadows-off": 131.01,
+    "04-sky-fill-off": 86.86
+  }
+}

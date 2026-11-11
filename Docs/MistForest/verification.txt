@@ -1,0 +1,6 @@
+Unity 6000.6.0f1
+NVIDIA GeForce RTX 4070 Laptop GPU
+Direct3D11
+1280 x 720; same camera/light for 01-04 and 06; Noise Speed = 0; RenderSettings.fog = false
+Shader supported and no compile errors.
+Scene roots: 13 objects

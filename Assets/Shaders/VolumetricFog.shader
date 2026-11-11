@@ -28,6 +28,9 @@ Shader "Custom/VolumetricFog"
         [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
         _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
         _CloudBounce ("Diffuse Light Fill", Range(0, 1)) = 0
+        [ToggleUI] _ForestFog ("Forest Height Fog", Float) = 0
+        _FogHeightFalloff ("Forest Height Falloff", Range(0.05, 2)) = 0.3
+        [ToggleUI] _SceneShadows ("Receive Tree Shadows", Float) = 0
     }
 
     SubShader
@@ -51,6 +54,13 @@ Shader "Custom/VolumetricFog"
             #pragma target 3.5
             #pragma vertex vert
             #pragma fragment frag
+            // Editor comparison only; production materials leave this keyword disabled.
+            #pragma shader_feature_local_fragment _ FOG_VALIDATE_IGNORE_DEPTH
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+
+            // Volumetric samples must read the shadow atlas at their own 3D positions.
+            #define _SURFACE_TYPE_TRANSPARENT 1
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -96,6 +106,9 @@ Shader "Custom/VolumetricFog"
                 float _LightSteps;
                 float _LightExtinction;
                 float _CloudBounce;
+                float _ForestFog;
+                float _FogHeightFalloff;
+                float _SceneShadows;
             CBUFFER_END
 
             Varyings vert(Attributes input)
@@ -199,6 +212,25 @@ Shader "Custom/VolumetricFog"
             {
                 if (_Coverage <= 0.0)
                     return 0.0;
+
+                if (_ForestFog > 0.5)
+                {
+                    float3 world = TransformObjectToWorld(positionOS);
+                    float3 p = world * 0.13 - windOffset * 6.0;
+                    float noise = PerlinFbm(p);
+                    float pockets = smoothstep(0.23, 0.78, noise);
+                    // A continuous, thin medium plus drifting denser pockets near the floor.
+                    float lowLayer = exp(-max(world.y - 0.2, 0.0) * _FogHeightFalloff);
+                    float wisps = lerp(0.24, 1.0, pockets);
+                    if (sampleDetail && _Erosion > 0.0)
+                        wisps *= 1.0 - _Erosion * WorleyNoise(p * _DetailScale);
+                    float edge = 1.0 - smoothstep(0.38, 0.50, max(abs(positionOS.x), abs(positionOS.z)));
+                    float topFade = 1.0 - smoothstep(0.32, 0.50, positionOS.y);
+                    // A clearer entrance lets foreground roots frame the denser forest interior.
+                    // This is a fixed spatial envelope, not a camera-dependent depth fade.
+                    float entrance = lerp(0.22, 1.0, smoothstep(-0.33, -0.17, positionOS.z));
+                    return _Density * _Coverage * (0.12 + lowLayer * wisps) * edge * topFade * entrance;
+                }
 
                 float height = positionOS.y + 0.5;
                 float layerHeight = max(0.05, _CloudTop - _CloudBase);
@@ -323,7 +355,10 @@ Shader "Custom/VolumetricFog"
                 float eyeDepth = perspective
                     ? LinearEyeDepth(rawDepth, _ZBufferParams)
                     : LinearDepthToEyeDepth(rawDepth);
-                exit = min(exit, min(eyeDepth, _ProjectionParams.z) / forwardProjection);
+                exit = min(exit, _ProjectionParams.z / forwardProjection);
+                #if !defined(FOG_VALIDATE_IGNORE_DEPTH)
+                    exit = min(exit, eyeDepth / forwardProjection);
+                #endif
                 if (exit <= entry)
                     return 0;
 
@@ -359,6 +394,13 @@ Shader "Custom/VolumetricFog"
                     // A broader, less attenuated lobe approximates light scattered into the cloud interior.
                     float fill = _CloudBounce * max(0.0, sqrt(sunTransmittance) - sunTransmittance);
                     float lighting = phase * sunTransmittance + fill;
+                    if (_SceneShadows > 0.5)
+                    {
+                        float3 sampleWS = originWS + rayDir * distanceAlongRay;
+                        float shadow = MainLightRealtimeShadow(TransformWorldToShadowCoord(sampleWS));
+                        shadow = lerp(shadow, 1.0, GetMainLightShadowFade(sampleWS));
+                        lighting *= shadow;
+                    }
                     float3 ambient = _AmbientStrength;
                     if (_SkyFillStrength > 0.0)
                     {

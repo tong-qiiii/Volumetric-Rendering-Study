@@ -12,6 +12,16 @@ A computer graphics course project for real-time volumetric clouds in Unity 6000
 
 ## Running the demo
 
+The current close-range showcase is **`Assets/Scenes/MistForest.unity`**. Enter Play mode to see the drifting forest mist, moss path, ancient trees, lanterns, and ruined gate. This is an original stylized forest inspired by the atmosphere of Breath of the Wild; the meshes and textures are generated within this project. The previous open valley remains available as `CloudValley.unity`.
+
+[Forest screenshot](Docs/MistForest/01-forest-final.png) · [Mist on/off](Docs/MistForest/07-fog-comparison.png) · [Rewritten midterm report](Docs/MistForest/MidtermReport.md) · [PDF report](Docs/MistForest/实时体积云渲染中期报告.pdf)
+
+Select **Forest volume - select material to tune fog** to adjust the `Forest mist` material. **Forest Height Fog** selects a continuous near-ground density field with exponential height falloff, Perlin pockets and Worley detail. The entrance has a fixed, thinner spatial envelope. **Receive Tree Shadows** samples the main-light shadow atlas along the view ray; **Sky Fill Strength** controls the upward ambient contribution. Unity's built-in global fog is disabled. Lantern point lights illuminate surfaces, but are not yet included in the volume scattering calculation.
+
+Use **Cloud Study > Capture Mist Forest Comparisons** to render the saved forest in an isolated preview scene at 1280 × 720, with wind frozen. It writes the fog, tree-shadow, sky-fill and depth-clipping comparisons to `Docs/MistForest`. The diagnostic depth keyword is enabled only on a temporary material. **Cloud Study > Build Mist Forest** regenerates the procedural assets and forest scene; save scene edits first, and note that rebuilding replaces generated scene content. The baked scene itself does not require the editor generator to run.
+
+The original minimal algorithm test is still available:
+
 Open `Assets/Scenes/MainScene.unity` and enter Play mode. Select the `FogVolume` cube and edit its material in the Inspector. The shader expects a centered unit cube mesh and supports scaling through the cube transform. Both included URP quality assets enable Depth Texture. If using a different camera or URP asset, keep Depth Texture enabled.
 
 - Set **Coverage** to 0 to hide the cloud. Increase it to admit more of the base noise field. Keep **Cloud Top** above **Cloud Base** to control the vertical envelope.
