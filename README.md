@@ -60,3 +60,11 @@ F2 switches High (128 view / 6 sun / 3 sky), Balanced (48 / 3 / 1, default) and 
 **Cloud Study > Benchmark Forest Sampling** writes same-camera screenshots and timings to `Docs/MistForest/Performance`. In the recorded 1280 x 720 editor experiment, median synchronous render-plus-readback times were 132.905 ms (High), 66.955 ms (view budget only), 39.169 ms (Balanced), and 8.007 ms (fog off). This is not GPU-only time or gameplay FPS. Fast was not measured. Each preset used three warmups and eight measured samples, in sequential order. Dynamic camera motion and collision edge cases still need live validation.
 
 The updated eight-page midterm report includes the optimization steps, measurements, image comparison and limitations.
+
+## Sunset cloud sea
+
+Open `Assets/Scenes/SunsetSea.unity` and enter Play. Click Game view for first-person movement. Keys 1, 2 and 3 switch before sunset, sunset and after sunset. WASD walks, Shift runs, Space jumps, R resets to the platform and Escape releases the cursor. F2 switches cloud sampling quality.
+
+The scene uses an original procedural observation deck, mountain silhouettes, volumetric cloud sea and an artistic gradient sky with a sun disk. Cloud Study > Capture Sunset Sea renders three fixed-camera frames and depth-clipping diagnostics. The recorded Play-mode input check passed walking, jumping, eye-height camera positioning and key-3 stage switching. The platform collision checks passed grounding, lateral motion and front parapet blocking. Mouse feel and exhaustive edge-case traversal remain unmeasured.
+
+[Three stages](Docs/SunsetSea/06-three-stages.png) · [Ridge occlusion](Docs/SunsetSea/07-ridge-comparison.png) · [Implementation and validation](Docs/SunsetSea/Process.md)

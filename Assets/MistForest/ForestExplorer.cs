@@ -4,6 +4,9 @@ using UnityEngine.InputSystem;
 // Attach to the saved showcase camera. The edit-mode composition stays unchanged.
 public sealed class ForestExplorer : MonoBehaviour
 {
+    public Vector3 spawnPosition = new Vector3(.1f, 1.2f, -7.5f);
+    public float respawnHeight = -8;
+    public string volumeObjectPrefix = "Forest volume";
     CharacterController motor;
 
     Vector3 spawn;
@@ -38,13 +41,13 @@ public sealed class ForestExplorer : MonoBehaviour
         var player = new GameObject("Explorer - WASD to walk");
         UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(player, gameObject.scene);
         player.layer = 2; // Excluded by camera obstruction queries, still collides with the world.
-        spawn = new Vector3(.1f, 1.2f, -7.5f); player.transform.position = spawn;
+        spawn = spawnPosition; player.transform.position = spawn;
         motor = player.AddComponent<CharacterController>();
         motor.height = 1.8f; motor.radius = .29f; motor.center = Vector3.up * .9f;
         motor.stepOffset = .32f; motor.slopeLimit = 48; motor.skinWidth = .035f;
         yaw = transform.eulerAngles.y;
         foreach(var root in gameObject.scene.GetRootGameObjects())
-            if(root.name.StartsWith("Forest volume"))fogRenderer=root.GetComponent<Renderer>();
+            if(root.name.StartsWith(volumeObjectPrefix))fogRenderer=root.GetComponent<Renderer>();
         if(fogRenderer){originalFog=fogRenderer.sharedMaterial;runtimeFog=new Material(originalFog);fogRenderer.sharedMaterial=runtimeFog;ApplyQuality();}
     }
     void ApplyQuality()
@@ -81,7 +84,7 @@ public sealed class ForestExplorer : MonoBehaviour
         verticalSpeed-=18*Time.deltaTime;
         float speed=captured && keys.leftShiftKey.isPressed?5:2.5f;
         motor.Move((movement*speed+Vector3.up*verticalSpeed)*Time.deltaTime);
-        if(motor.transform.position.y < -8){motor.enabled=false;motor.transform.position=spawn;motor.enabled=true;verticalSpeed=0;}
+        if(motor.transform.position.y < respawnHeight){motor.enabled=false;motor.transform.position=spawn;motor.enabled=true;verticalSpeed=0;}
     }
     void LateUpdate()
     {

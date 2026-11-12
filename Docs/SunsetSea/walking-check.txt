@@ -1,0 +1,1 @@
+Controller grounded=True; front parapet stops movement=True; lateral walking=True. Editor-driven CharacterController.Move checks. Keyboard/mouse feel not measured.
