@@ -14,6 +14,7 @@ Shader "Custom/VolumetricFog"
         _CloudTop ("Cloud Top", Range(0.05, 1)) = 0.90
         _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
         _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
+        [ToggleUI] _CumulusMode ("Rounded Cumulus Volumes", Float) = 0
         _CloudBillow ("Billowing Shape", Range(0, 1)) = 0
         [ToggleUI] _UseWeatherMap ("Use Weather Map", Float) = 0
         [NoScaleOffset] _WeatherMap ("Weather Map (R Coverage, G Top Height, B Base Height)", 2D) = "black" {}
@@ -27,7 +28,7 @@ Shader "Custom/VolumetricFog"
         _SkyFillStrength ("Sky Fill Strength", Range(0, 1)) = 0
         [IntRange] _LightSteps ("Light Steps", Range(0, 8)) = 4
         _LightExtinction ("Light Extinction", Range(0, 4)) = 1.8
-        [IntRange] _ViewSteps ("View Step Budget", Range(16,128)) = 128
+        [IntRange] _ViewSteps ("View Step Budget", Range(16,256)) = 128
         [IntRange] _SkySteps ("Sky Step Budget", Range(1,3)) = 3
         _CloudBounce ("Diffuse Light Fill", Range(0, 1)) = 0
         [ToggleUI] _ForestFog ("Forest Height Fog", Float) = 0
@@ -97,6 +98,7 @@ Shader "Custom/VolumetricFog"
                 float _DetailScale;
                 float _Erosion;
                 float _CloudBillow;
+                float _CumulusMode;
                 float _UseWeatherMap;
                 float4 _WindDirection;
                 float _Anisotropy;
@@ -212,10 +214,42 @@ Shader "Custom/VolumetricFog"
                 return exit > entry;
             }
 
+            // World-metric lobes avoid stretching 3D noise into horizontal sheets.
+            float CumulusDensity(float3 positionOS, float3 windOffset)
+            {
+                float3 p = positionOS * float3(330,120,300) - sin(windOffset) * 8;
+                float field = -1000;
+                [loop] for(int group=0;group<5;group++)
+                {
+                    float3 center = group==0 ? float3(-65,-4,-60) : group==1 ? float3(48,-8,-45)
+                        : group==2 ? float3(-36,6,28) : group==3 ? float3(66,-3,65) : float3(-75,-10,82);
+                    float size = group==2 ? 1.1 : group==1 ? .85 : 1;
+                    // A broad core and overlapping rising lobes form cauliflower silhouettes.
+                    float3 q=(p-center)/size;
+                    float d=22-length(q/float3(1.35,.85,1.15));
+                    [loop] for(int lobe=0;lobe<10;lobe++)
+                    {
+                        float3 seed=HashCell(float3(group*7+lobe,13,41));
+                        float angle=lobe*2.39996;
+                        float3 offset=float3(cos(angle)*20,10+seed.y*18,sin(angle)*18);
+                        float radius=10+seed.x*7;
+                        d=max(d,radius-length(q-offset));
+                    }
+                    field=max(field,d*size);
+                }
+                float broad=(PerlinFbm(p*.075)-.5)*16;
+                float fine=(PerlinNoise(p*.29+7)-.5)*3.5;
+                float shape=smoothstep(-.5,3.5,field+broad+fine);
+                float base=smoothstep(-37,-24,p.y);
+                return _Density*shape*base*_Coverage;
+            }
+
             float SampleDensity(float3 positionOS, float3 windOffset, bool sampleDetail)
             {
                 if (_Coverage <= 0.0)
                     return 0.0;
+
+                if (_CumulusMode > 0.5) return CumulusDensity(positionOS,windOffset);
 
                 if (_ForestFog > 0.5)
                 {
@@ -322,13 +356,18 @@ Shader "Custom/VolumetricFog"
                 if (!IntersectVolume(positionOS, sampleDirOS, entry, exit) || exit <= 0.0)
                     return 0.0;
 
+                if (_CumulusMode > 0.5) exit=min(exit,100.0);
                 float stepLength = exit / steps;
                 float opticalDepth = 0.0;
                 [loop]
                 for (int i = 0; i < steps; i++)
                 {
-                    float3 sampleOS = positionOS + sampleDirOS * ((i + 0.5) * stepLength);
-                    opticalDepth += SampleDensity(sampleOS, windOffset, false) * stepLength;
+                    float a=exit*pow((float)i/steps,2.0);
+                    float b=exit*pow((float)(i+1)/steps,2.0);
+                    float distance = _CumulusMode > .5 ? (a+b)*.5 : (i+.5)*stepLength;
+                    float weight = _CumulusMode > .5 ? b-a : stepLength;
+                    float3 sampleOS = positionOS + sampleDirOS * distance;
+                    opticalDepth += SampleDensity(sampleOS, windOffset, false) * weight;
                 }
                 return opticalDepth;
             }
@@ -366,7 +405,7 @@ Shader "Custom/VolumetricFog"
                 if (exit <= entry)
                     return 0;
 
-                int maxSamples = (int)clamp(_ViewSteps,16.0,128.0);
+                int maxSamples = (int)clamp(_ViewSteps,16.0,256.0);
                 int sampleCount = (int)clamp(ceil((exit - entry) / max(_StepSize, 0.001)), 1.0, (float)maxSamples);
                 float stepLength = (exit - entry) / sampleCount;
                 Light mainLight = GetMainLight();
@@ -384,10 +423,11 @@ Shader "Custom/VolumetricFog"
                 float transmittance = 1.0;
                 float3 accumulatedColor = 0.0;
 
+                float jitter = _CumulusMode > .5 ? frac(52.9829189*frac(dot(input.positionHCS.xy,float2(.06711056,.00583715)))) : .5;
                 [loop]
                 for (int i = 0; i < sampleCount; i++)
                 {
-                    float distanceAlongRay = entry + (i + 0.5) * stepLength;
+                    float distanceAlongRay = entry + (i + jitter) * stepLength;
                     float3 sampleOS = originOS + directionOS * distanceAlongRay;
                     float density = SampleDensity(sampleOS, windOffset, true);
                     if (density <= 0.0)

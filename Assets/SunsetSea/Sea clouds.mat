@@ -29,20 +29,21 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AmbientStrength: 0.09
+    - _AmbientStrength: 0.07
     - _Anisotropy: 0.45
     - _CloudBase: 0.06
     - _CloudBillow: 0.7
-    - _CloudBounce: 0.35
+    - _CloudBounce: 0.4
     - _CloudTop: 0.9
     - _Coverage: 1
-    - _Density: 0.15
+    - _CumulusMode: 1
+    - _Density: 0.095
     - _DetailScale: 3.5
     - _Erosion: 0.16
     - _FogHeightFalloff: 0.3
     - _ForestFog: 0
-    - _LightExtinction: 1.1
-    - _LightSteps: 3
+    - _LightExtinction: 1
+    - _LightSteps: 8
     - _NoiseScale: 7
     - _NoiseSpeed: 0.003
     - _NoiseThreshold: 0.33
@@ -50,10 +51,10 @@ Material:
     - _SceneShadows: 0
     - _SecondaryAnisotropy: -0.2
     - _SkyFillStrength: 0.38
-    - _SkySteps: 1
+    - _SkySteps: 3
     - _StepSize: 0.1
     - _UseWeatherMap: 1
-    - _ViewSteps: 96
+    - _ViewSteps: 192
     m_Colors:
     - _FogColor: {r: 0.9, g: 0.92, b: 1, a: 1}
     - _SkyFillColor: {r: 0.55, g: 0.66, b: 0.9, a: 1}

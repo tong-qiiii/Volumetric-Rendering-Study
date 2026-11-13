@@ -1,0 +1,1 @@
+Rounded world-metric lobes; 192 view samples with fixed spatial jitter; 8 near-biased sun samples, 3 sky samples. Same camera and phase lighting as before. 2026-11-13T19:00:35

@@ -53,9 +53,9 @@ public sealed class ForestExplorer : MonoBehaviour
     void ApplyQuality()
     {
         if(!runtimeFog)return;
-        runtimeFog.SetFloat("_ViewSteps",quality==0?128:quality==1?Mathf.Clamp(originalFog.GetFloat("_ViewSteps"),48,128):32);
-        runtimeFog.SetFloat("_LightSteps",quality==0?6:quality==1?3:2);
-        runtimeFog.SetFloat("_SkySteps",quality==0?3:1);
+        runtimeFog.SetFloat("_ViewSteps",quality==0?Mathf.Max(128,originalFog.GetFloat("_ViewSteps")):quality==1?Mathf.Clamp(originalFog.GetFloat("_ViewSteps"),48,256):32);
+        runtimeFog.SetFloat("_LightSteps",quality==0?Mathf.Max(6,originalFog.GetFloat("_LightSteps")):quality==1?Mathf.Max(3,originalFog.GetFloat("_LightSteps")):2);
+        runtimeFog.SetFloat("_SkySteps",quality==0?3:quality==1?Mathf.Max(1,originalFog.GetFloat("_SkySteps")):1);
     }
     void Capture(bool value)
     {
@@ -81,9 +81,18 @@ public sealed class ForestExplorer : MonoBehaviour
         Vector3 movement=Quaternion.Euler(0,yaw,0)*new Vector3(input.x,0,input.y);
         if(motor.isGrounded && verticalSpeed<0)verticalSpeed=-2;
         if(captured && motor.isGrounded && keys.spaceKey.wasPressedThisFrame)verticalSpeed=Mathf.Sqrt(2*18*1.1f);
-        verticalSpeed-=18*Time.deltaTime;
         float speed=captured && keys.leftShiftKey.isPressed?5:2.5f;
-        motor.Move((movement*speed+Vector3.up*verticalSpeed)*Time.deltaTime);
+        // Substep character motion so a long render frame cannot erase the jump impulse.
+        int motionSteps=Mathf.Max(1,Mathf.CeilToInt(Time.deltaTime*60));
+        float dt=Time.deltaTime/motionSteps;
+        for(int i=0;i<motionSteps;i++)
+        {
+            float rise=verticalSpeed*dt-9*dt*dt;
+            verticalSpeed-=18*dt;
+            var hits=motor.Move(movement*speed*dt+Vector3.up*rise);
+            if((hits&CollisionFlags.Above)!=0 && verticalSpeed>0)verticalSpeed=0;
+            if((hits&CollisionFlags.Below)!=0 && verticalSpeed<0)verticalSpeed=-2;
+        }
         if(motor.transform.position.y < respawnHeight){motor.enabled=false;motor.transform.position=spawn;motor.enabled=true;verticalSpeed=0;}
     }
     void LateUpdate()
