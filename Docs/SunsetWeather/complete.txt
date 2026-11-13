@@ -1,0 +1,1 @@
+Fixed camera/light/frozen noise, 96 view steps in all captures. Baseline: original density shape. Weather: map plus threshold .33, noise scale 7, density .15. Final: erosion .10 to .16. Ridge lower vertices extended in all captures. 2026-11-13T18:43:17

@@ -9,7 +9,8 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 public static class SunsetSeaBuilder
 {
-    const string Root="Assets/SunsetSea/", Path="Assets/Scenes/SunsetSea.unity", Output="Docs/SunsetSea/";
+    const string Root="Assets/SunsetSea/", Path="Assets/Scenes/SunsetSea.unity";
+    public static string Output="Docs/SunsetSea/";
     [InitializeOnLoadMethod] static void Queue(){if(File.Exists(".utmp/build-sunset"))EditorApplication.update+=Pending;}
     static void Pending()
     {
@@ -52,13 +53,14 @@ public static class SunsetSeaBuilder
             float height=i<2?54:28+(float)rng.NextDouble()*25;
             var go=GameObject.CreatePrimitive(PrimitiveType.Sphere);go.name="Mountain ridge";go.transform.position=new Vector3(x,-14,z);go.transform.localScale=new Vector3(42,height*2,48);go.GetComponent<Renderer>().sharedMaterial=rock;
             var source=go.GetComponent<MeshFilter>().sharedMesh;var mesh=UnityEngine.Object.Instantiate(source);mesh.name="Ridge "+i;
-            var vertices=mesh.vertices;for(int j=0;j<vertices.Length;j++){var v=vertices[j];float n=Mathf.PerlinNoise(v.x*5+i,v.z*5+3);v.y*=.65f+n*.7f;vertices[j]=v;}
+            var vertices=mesh.vertices;for(int j=0;j<vertices.Length;j++){var v=vertices[j];float n=Mathf.PerlinNoise(v.x*5+i,v.z*5+3);v.y*=.65f+n*.7f;if(v.y<0)v.y*=12;vertices[j]=v;}
             mesh.vertices=vertices;mesh.RecalculateNormals();mesh.RecalculateBounds();
             string mp=Root+"Ridge"+i+".asset";var old=AssetDatabase.LoadAssetAtPath<Mesh>(mp);if(old){EditorUtility.CopySerialized(mesh,old);UnityEngine.Object.DestroyImmediate(mesh);mesh=old;}else AssetDatabase.CreateAsset(mesh,mp);go.GetComponent<MeshFilter>().sharedMesh=mesh;
         }
         var cloud=AssetDatabase.LoadAssetAtPath<Material>(Root+"Sea clouds.mat");
         if(!cloud){cloud=new Material(Shader.Find("Custom/VolumetricFog"));AssetDatabase.CreateAsset(cloud,Root+"Sea clouds.mat");}
         cloud.SetFloat("_Density",.12f);cloud.SetFloat("_Coverage",1f);cloud.SetFloat("_NoiseThreshold",.20f);cloud.SetFloat("_NoiseScale",5.5f);cloud.SetFloat("_CloudBillow",.7f);cloud.SetFloat("_CloudBase",.06f);cloud.SetFloat("_CloudTop",.9f);cloud.SetFloat("_Erosion",.10f);cloud.SetFloat("_DetailScale",3.5f);cloud.SetFloat("_ViewSteps",48);cloud.SetFloat("_LightSteps",3);cloud.SetFloat("_SkySteps",1);cloud.SetFloat("_StepSize",.1f);cloud.SetFloat("_Anisotropy",.45f);cloud.SetFloat("_SecondaryAnisotropy",-.2f);cloud.SetFloat("_PhaseBlend",.25f);cloud.SetFloat("_AmbientStrength",.09f);cloud.SetFloat("_LightExtinction",1.1f);cloud.SetFloat("_CloudBounce",.35f);cloud.SetFloat("_NoiseSpeed",.003f);cloud.SetColor("_FogColor",new Color(.9f,.92f,1));
+        if(cloud.GetFloat("_UseWeatherMap")>0.5f && cloud.GetTexture("_WeatherMap")){cloud.SetFloat("_NoiseThreshold",.33f);cloud.SetFloat("_NoiseScale",7);cloud.SetFloat("_Density",.15f);cloud.SetFloat("_Erosion",.16f);cloud.SetFloat("_ViewSteps",96);}
         var volume=Box("Cloud sea",new Vector3(0,20,130),new Vector3(330,44,300),cloud);UnityEngine.Object.DestroyImmediate(volume.GetComponent<Collider>());volume.GetComponent<Renderer>().shadowCastingMode=ShadowCastingMode.Off;
         var cameraObject=new GameObject("Main Camera");cameraObject.tag="MainCamera";var camera=cameraObject.AddComponent<Camera>();camera.transform.position=new Vector3(0,39.2f,-4);camera.transform.rotation=Quaternion.Euler(8,0,0);camera.fieldOfView=62;camera.farClipPlane=650;camera.nearClipPlane=.1f;camera.clearFlags=CameraClearFlags.Skybox;camera.GetUniversalAdditionalCameraData().requiresDepthTexture=true;camera.GetUniversalAdditionalCameraData().renderPostProcessing=true;cameraObject.AddComponent<AudioListener>();var walker=cameraObject.AddComponent<ForestExplorer>();walker.spawnPosition=new Vector3(0,37.7f,-4);walker.respawnHeight=25;walker.volumeObjectPrefix="Cloud sea";
         var light=new GameObject("Sun").AddComponent<Light>();light.type=LightType.Directional;light.shadows=LightShadows.Soft;

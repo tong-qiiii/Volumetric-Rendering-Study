@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _WeatherMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: d8e4b7d460b948e488c9e1a738dc7156, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -36,24 +36,24 @@ Material:
     - _CloudBounce: 0.35
     - _CloudTop: 0.9
     - _Coverage: 1
-    - _Density: 0.12
+    - _Density: 0.15
     - _DetailScale: 3.5
-    - _Erosion: 0.1
+    - _Erosion: 0.16
     - _FogHeightFalloff: 0.3
     - _ForestFog: 0
     - _LightExtinction: 1.1
     - _LightSteps: 3
-    - _NoiseScale: 5.5
+    - _NoiseScale: 7
     - _NoiseSpeed: 0.003
-    - _NoiseThreshold: 0.2
+    - _NoiseThreshold: 0.33
     - _PhaseBlend: 0.25
     - _SceneShadows: 0
     - _SecondaryAnisotropy: -0.2
     - _SkyFillStrength: 0.38
     - _SkySteps: 1
     - _StepSize: 0.1
-    - _UseWeatherMap: 0
-    - _ViewSteps: 48
+    - _UseWeatherMap: 1
+    - _ViewSteps: 96
     m_Colors:
     - _FogColor: {r: 0.9, g: 0.92, b: 1, a: 1}
     - _SkyFillColor: {r: 0.55, g: 0.66, b: 0.9, a: 1}

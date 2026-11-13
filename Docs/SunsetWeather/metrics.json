@@ -1,0 +1,13 @@
+{
+  "ridge_occluded_pixels": 5699,
+  "cloud_roi_luma": [
+    183.7,
+    125.67,
+    75.41
+  ],
+  "resolution": [
+    1280,
+    720
+  ],
+  "view_steps": 96
+}

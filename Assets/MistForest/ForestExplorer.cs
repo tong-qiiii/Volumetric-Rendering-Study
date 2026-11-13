@@ -53,7 +53,7 @@ public sealed class ForestExplorer : MonoBehaviour
     void ApplyQuality()
     {
         if(!runtimeFog)return;
-        runtimeFog.SetFloat("_ViewSteps",quality==0?128:quality==1?48:32);
+        runtimeFog.SetFloat("_ViewSteps",quality==0?128:quality==1?Mathf.Clamp(originalFog.GetFloat("_ViewSteps"),48,128):32);
         runtimeFog.SetFloat("_LightSteps",quality==0?6:quality==1?3:2);
         runtimeFog.SetFloat("_SkySteps",quality==0?3:1);
     }
