@@ -39,7 +39,7 @@ public static class SunsetPlayCheck
             {
                 var lighting=UnityEngine.Object.FindFirstObjectByType<SunsetSeaLighting>();bool phase=lighting.sun.intensity<.1f;
                 InputSystem.QueueStateEvent(Keyboard.current,new KeyboardState());
-                File.WriteAllText("Docs/SunsetCumulus/play-check.txt","Play mode input test: A movement="+walked+"; Space jump="+jumped+"; eye-height camera="+firstPerson+"; key 3 after-sunset="+phase+"; rise="+jumpRise+"; frame dt="+jumpDelta+". InputSystem queued keyboard states through normal Update. Mouse feel not measured.");
+                File.WriteAllText("Docs/CumulusPerformance/play-check.txt","Play mode input test: A movement="+walked+"; Space jump="+jumped+"; eye-height camera="+firstPerson+"; key 3 after-sunset="+phase+"; rise="+jumpRise+"; frame dt="+jumpDelta+". InputSystem queued keyboard states through normal Update. Mouse feel not measured.");
                 File.Delete(".utmp/play-sunset");EditorApplication.update-=Tick;EditorApplication.isPlaying=false;return;
             }
             inputFrame=Time.frameCount;step++;
@@ -49,3 +49,4 @@ public static class SunsetPlayCheck
 }
 
 // Cumulus scene regression.
+// Cached density regression.

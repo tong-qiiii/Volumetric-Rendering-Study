@@ -1,0 +1,15 @@
+#pragma kernel Bake
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#define CUMULUS_BAKE 1
+static const float _Density=1;
+static const float _Coverage=1;
+#include "CloudNoise.hlsl"
+#include "CumulusDensity.hlsl"
+RWTexture3D<float> Result;
+[numthreads(8,8,8)]
+void Bake(uint3 id:SV_DispatchThreadID)
+{
+    uint w,h,d;Result.GetDimensions(w,h,d);
+    if(any(id>=uint3(w,h,d)))return;
+    Result[id]=CumulusDensity((float3(id)+.5)/float3(w,h,d)-.5,0);
+}

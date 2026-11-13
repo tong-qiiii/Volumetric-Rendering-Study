@@ -23,6 +23,10 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _CumulusDensityTex:
+        m_Texture: {fileID: 11700000, guid: c159a16786d584843992fe157496c5bd, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WeatherMap:
         m_Texture: {fileID: 2800000, guid: d8e4b7d460b948e488c9e1a738dc7156, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -53,8 +57,9 @@ Material:
     - _SkyFillStrength: 0.38
     - _SkySteps: 3
     - _StepSize: 0.1
+    - _UseBakedDensity: 1
     - _UseWeatherMap: 1
-    - _ViewSteps: 192
+    - _ViewSteps: 96
     m_Colors:
     - _FogColor: {r: 0.9, g: 0.92, b: 1, a: 1}
     - _SkyFillColor: {r: 0.55, g: 0.66, b: 0.9, a: 1}

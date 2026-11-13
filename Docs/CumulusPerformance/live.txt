@@ -1,0 +1,1 @@
+Play mode Editor frame intervals: 30 warmup frames + 90 samples; median=6.497 ms; p95=7.918 ms; camera=2560x1440; GPU=NVIDIA GeForce RTX 4070 Laptop GPU; vSyncCount=0; targetFrameRate=-1. Includes Editor overhead; not standalone build performance; unchanged frame cap settings.

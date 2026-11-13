@@ -31,7 +31,7 @@ public static class SunsetCumulusStudy
             EditorUtility.SetDirty(mat);AssetDatabase.SaveAssets();EditorSceneManager.SaveScene(scene);
             SunsetSeaBuilder.Output="Docs/SunsetCumulus/After/";SunsetSeaBuilder.Capture();
             mat.SetFloat("_ViewSteps",256);SunsetSeaBuilder.Output="Docs/SunsetCumulus/Reference/";SunsetSeaBuilder.Capture();
-            mat.SetFloat("_ViewSteps",192);EditorUtility.SetDirty(mat);AssetDatabase.SaveAssets();
+            mat.SetFloat("_ViewSteps",192);if(mat.HasProperty("_UseBakedDensity") && mat.GetFloat("_UseBakedDensity")>.5f){mat.SetFloat("_ViewSteps",96);mat.SetFloat("_LightSteps",8);mat.SetFloat("_SkySteps",3);}EditorUtility.SetDirty(mat);AssetDatabase.SaveAssets();
             File.WriteAllText("Docs/SunsetCumulus/complete.txt","Rounded world-metric lobes; 192 view samples with fixed spatial jitter; 8 near-biased sun samples, 3 sky samples. Same camera and phase lighting as before. "+DateTime.Now.ToString("s"));
             File.Delete(".utmp/cumulus");
         }

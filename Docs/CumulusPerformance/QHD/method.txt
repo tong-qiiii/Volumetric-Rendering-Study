@@ -1,0 +1,2 @@
+6000.6.0f1 / NVIDIA GeForce RTX 4070 Laptop GPU / Direct3D11
+2560x1440, fixed sunset camera, frozen wind. 2 warmups + 5 samples per preset. Median wall time includes render submission, GPU completion and synchronous readback. Not gameplay FPS or GPU-only time. 256x128x256 RHalf density cache (16 MiB raw). Same source density function baked at voxel centers. Linear filtering; no mipmaps. Default changed to cached 96/8/3. Shader check passed.

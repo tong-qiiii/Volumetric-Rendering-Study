@@ -1,0 +1,6 @@
+preset,view,sun,sky,median_ms,min_ms,max_ms
+procedural,192,8,3,67.018,61.234,76.159
+cache_same,192,8,3,12.262,10.289,13.650
+balanced,96,8,3,10.059,8.717,10.463
+fast,64,6,2,10.343,9.326,10.919
+cloud_off,96,8,3,5.835,5.224,7.602

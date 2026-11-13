@@ -53,9 +53,10 @@ public sealed class ForestExplorer : MonoBehaviour
     void ApplyQuality()
     {
         if(!runtimeFog)return;
-        runtimeFog.SetFloat("_ViewSteps",quality==0?Mathf.Max(128,originalFog.GetFloat("_ViewSteps")):quality==1?Mathf.Clamp(originalFog.GetFloat("_ViewSteps"),48,256):32);
-        runtimeFog.SetFloat("_LightSteps",quality==0?Mathf.Max(6,originalFog.GetFloat("_LightSteps")):quality==1?Mathf.Max(3,originalFog.GetFloat("_LightSteps")):2);
-        runtimeFog.SetFloat("_SkySteps",quality==0?3:quality==1?Mathf.Max(1,originalFog.GetFloat("_SkySteps")):1);
+        bool cached=originalFog.HasProperty("_UseBakedDensity") && originalFog.GetFloat("_UseBakedDensity")>.5f;
+        runtimeFog.SetFloat("_ViewSteps",quality==0?Mathf.Max(128,originalFog.GetFloat("_ViewSteps")):quality==1?Mathf.Clamp(originalFog.GetFloat("_ViewSteps"),48,256):cached?64:32);
+        runtimeFog.SetFloat("_LightSteps",quality==0?Mathf.Max(6,originalFog.GetFloat("_LightSteps")):quality==1?Mathf.Max(3,originalFog.GetFloat("_LightSteps")):cached?6:2);
+        runtimeFog.SetFloat("_SkySteps",quality==0?3:quality==1?Mathf.Max(1,originalFog.GetFloat("_SkySteps")):cached?2:1);
     }
     void Capture(bool value)
     {

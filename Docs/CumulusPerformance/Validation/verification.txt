@@ -1,0 +1,2 @@
+Unity 6000.6.0f1 / NVIDIA GeForce RTX 4070 Laptop GPU
+1280x720 fixed camera (0,39.2,-4), pitch 8, frozen noise. Sun elevations 20,4,-6. Shader supported: True

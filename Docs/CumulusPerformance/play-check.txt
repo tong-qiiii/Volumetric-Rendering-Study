@@ -1,0 +1,1 @@
+Play mode input test: A movement=True; Space jump=True; eye-height camera=True; key 3 after-sunset=True; rise=0.8526726; frame dt=0.007652402. InputSystem queued keyboard states through normal Update. Mouse feel not measured.

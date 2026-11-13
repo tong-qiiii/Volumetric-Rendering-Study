@@ -14,6 +14,8 @@ Shader "Custom/VolumetricFog"
         _CloudTop ("Cloud Top", Range(0.05, 1)) = 0.90
         _DetailScale ("Detail Scale", Range(1, 12)) = 3.0
         _Erosion ("Edge Erosion", Range(0, 1)) = 0.45
+        [ToggleUI] _UseBakedDensity ("Use Cached 3D Density", Float) = 0
+        [NoScaleOffset] _CumulusDensityTex ("Cached Cumulus Density", 3D) = "" {}
         [ToggleUI] _CumulusMode ("Rounded Cumulus Volumes", Float) = 0
         _CloudBillow ("Billowing Shape", Range(0, 1)) = 0
         [ToggleUI] _UseWeatherMap ("Use Weather Map", Float) = 0
@@ -81,6 +83,8 @@ Shader "Custom/VolumetricFog"
                 float3 positionWS : TEXCOORD0;
             };
 
+            TEXTURE3D(_CumulusDensityTex);
+            SAMPLER(sampler_CumulusDensityTex);
             TEXTURE2D(_WeatherMap);
             SAMPLER(sampler_WeatherMap);
 
@@ -99,6 +103,7 @@ Shader "Custom/VolumetricFog"
                 float _Erosion;
                 float _CloudBillow;
                 float _CumulusMode;
+                float _UseBakedDensity;
                 float _UseWeatherMap;
                 float4 _WindDirection;
                 float _Anisotropy;
@@ -130,46 +135,7 @@ Shader "Custom/VolumetricFog"
                 return output;
             }
 
-            float3 HashCell(float3 cell)
-            {
-                float3 hash = frac(cell * float3(0.1031, 0.1030, 0.0973));
-                hash += dot(hash, hash.yxz + 33.33);
-                return frac((hash.xxy + hash.yxx) * hash.zyx);
-            }
-
-            float PerlinNoise(float3 position)
-            {
-                float3 cell = floor(position);
-                float3 offset = frac(position);
-                float3 fade = offset * offset * offset * (offset * (offset * 6.0 - 15.0) + 10.0);
-                float noise = 0.0;
-
-                [unroll]
-                for (int corner = 0; corner < 8; corner++)
-                {
-                    float3 vertex = float3(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1);
-                    float3 gradient = HashCell(cell + vertex) * 2.0 - 1.0;
-                    float3 weight = lerp(1.0 - fade, fade, vertex);
-                    noise += weight.x * weight.y * weight.z * dot(gradient, offset - vertex);
-                }
-
-                return saturate(0.5 + noise);
-            }
-
-            float PerlinFbm(float3 position)
-            {
-                float value = 0.0;
-                float amplitude = 0.5;
-                [unroll]
-                for (int octave = 0; octave < 3; octave++)
-                {
-                    value += amplitude * PerlinNoise(position);
-                    position = position * 2.03 + float3(5.2, 1.3, 8.7);
-                    amplitude *= 0.5;
-                }
-
-                return value / 0.875;
-            }
+            #include "CloudNoise.hlsl"
 
             float WorleyNoise(float3 position)
             {
@@ -214,35 +180,7 @@ Shader "Custom/VolumetricFog"
                 return exit > entry;
             }
 
-            // World-metric lobes avoid stretching 3D noise into horizontal sheets.
-            float CumulusDensity(float3 positionOS, float3 windOffset)
-            {
-                float3 p = positionOS * float3(330,120,300) - sin(windOffset) * 8;
-                float field = -1000;
-                [loop] for(int group=0;group<5;group++)
-                {
-                    float3 center = group==0 ? float3(-65,-4,-60) : group==1 ? float3(48,-8,-45)
-                        : group==2 ? float3(-36,6,28) : group==3 ? float3(66,-3,65) : float3(-75,-10,82);
-                    float size = group==2 ? 1.1 : group==1 ? .85 : 1;
-                    // A broad core and overlapping rising lobes form cauliflower silhouettes.
-                    float3 q=(p-center)/size;
-                    float d=22-length(q/float3(1.35,.85,1.15));
-                    [loop] for(int lobe=0;lobe<10;lobe++)
-                    {
-                        float3 seed=HashCell(float3(group*7+lobe,13,41));
-                        float angle=lobe*2.39996;
-                        float3 offset=float3(cos(angle)*20,10+seed.y*18,sin(angle)*18);
-                        float radius=10+seed.x*7;
-                        d=max(d,radius-length(q-offset));
-                    }
-                    field=max(field,d*size);
-                }
-                float broad=(PerlinFbm(p*.075)-.5)*16;
-                float fine=(PerlinNoise(p*.29+7)-.5)*3.5;
-                float shape=smoothstep(-.5,3.5,field+broad+fine);
-                float base=smoothstep(-37,-24,p.y);
-                return _Density*shape*base*_Coverage;
-            }
+            #include "CumulusDensity.hlsl"
 
             float SampleDensity(float3 positionOS, float3 windOffset, bool sampleDetail)
             {

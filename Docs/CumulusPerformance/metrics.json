@@ -1,0 +1,15 @@
+{
+  "cache_same": {
+    "cloud_pixel_MAE": 0.8886207511939674,
+    "p95": 3.0
+  },
+  "balanced": {
+    "cloud_pixel_MAE": 1.05813882252037,
+    "p95": 4.0
+  },
+  "fast": {
+    "cloud_pixel_MAE": 5.321889092211843,
+    "p95": 15.0
+  },
+  "occluded_pixels": 123544
+}
